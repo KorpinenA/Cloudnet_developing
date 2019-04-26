@@ -32,6 +32,7 @@ def generate_figure_from_two_files(nc_files, field_names, types, show=True,
         nc_files(list): list of two files to compare
                         [0] = old file
                         [1] = new file
+        types(list): list of plot types of variables
     """
     # Not working if variable name not same for old and new file
     field_names = plot._parse_field_names(nc_files[0], field_names)
@@ -72,7 +73,7 @@ def generate_figure_from_two_files(nc_files, field_names, types, show=True,
         ax[-1].set_xlabel('Time (UTC)', fontsize=13)
 
         if save_path:
-            file_name = parse_saving_name(save_path, case_date, [name], "_compare")
+            file_name = _parse_saving_name(save_path, case_date, [name], "_compare")
             plt.savefig(file_name, bbox_inches='tight', dpi=dpi)
         if show:
             plt.show()
@@ -108,7 +109,7 @@ def generate_relative_err_fig(nc_files, field_names, types, show=True,
             _plot_relative_error(ax[0], error, axis, name)
 
         if save_path:
-            file_name = parse_saving_name(save_path, case_date, [name], "_error")
+            file_name = _parse_saving_name(save_path, case_date, [name], "_error")
             plt.savefig(file_name, bbox_inches='tight', dpi=dpi)
         if show:
             plt.show()
@@ -124,7 +125,7 @@ def _interpolate_select_variables(field_names, data_field, axes):
     return data_field, axes
 
 
-def parse_saving_name(save_path, case_date, field_names, ending):
+def _parse_saving_name(save_path, case_date, field_names, ending):
     file_name = plot._create_save_name(save_path, case_date, field_names)
     file_name = file_name.split('.')
     file_name = file_name[0] + ending + ".png"
@@ -152,14 +153,12 @@ def _calculate_relative_error(old_data, new_data):
 if __name__ == '__main__':
     outname = '/home/korpinen/Documents/ACTRIS/cloudnetpy/test_data_iwc.nc'
     old_iwc_file = '/home/korpinen/Documents/ACTRIS/cloudnet_data/20181204_mace-head_iwc-Z-T-method.nc'
-    fname = '/home/korpinen/Documents/ACTRIS/cloudnet_data/categorize_test_file_new.nc'
-    old_fname = '/home/korpinen/Documents/ACTRIS/cloudnet_data/20181204_mace-head_categorize.nc'
     save_plots = '/home/korpinen/Documents/ACTRIS/cloudnetpy/plots/'
-    """
+
     generate_figure_from_two_files([old_iwc_file, outname],
                                    ['iwc', 'iwc_error', 'iwc_retrieval_status'],
                                    [None, None, None])
-    """
+
     generate_relative_err_fig([old_iwc_file, outname],
                               ['iwc', 'iwc_error', 'iwc_retrieval_status'],
                               [None, None, None])
