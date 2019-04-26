@@ -15,14 +15,14 @@ from cloudnetpy.plot_meta import ATTRIBUTES
 
 def _plot_relative_error(ax, error, axes, name):
     """Plots relative error"""
-    pl = ax.pcolormesh(*axes, error.T, cmap='RdBu', vmin=-30,
+    pl = ax.pcolorfast(*axes, error[:-1, :-1].T, cmap='RdBu', vmin=-30,
                        vmax=30)
     colorbar = plot._init_colorbar(pl, ax)
     colorbar.set_label("%", fontsize=13)
     ax.set_title("Relative error of " + name, fontsize=14)
 
 
-def generate_figure_from_two_files(nc_files, field_names, show=True,
+def generate_figure_from_two_files(nc_files, field_names, types, show=True,
                                    save_path=None, max_y=12, dpi=200):
     """ Compare product from two different files by subplotting
         Can plot several variables in loop,
@@ -33,28 +33,43 @@ def generate_figure_from_two_files(nc_files, field_names, show=True,
                         [0] = old file
                         [1] = new file
     """
+    # Not working if variable name not same for old and new file
     field_names = plot._parse_field_names(nc_files[0], field_names)
     data_fields = [ptools.read_nc_fields(nc_file, field_names) for nc_file in nc_files]
-    decimal_hours = [ptools.read_nc_fields(nc_file, ['time']) for nc_file in nc_files]
+
+    # Information used for interpolation
+    axes_data = [[plot._read_axes(nc_file, types[i]) for i in range(len(field_names))]
+                  for nc_file in nc_files]
+    data_fields, axes_data = _interpolate_select_variables(field_names, data_fields,
+                                                           axes_data)
     case_date = plot._read_case_date(nc_files[0])
-    axes = [[plot._read_axes(nc_file, case_date) for nc_file in nc_files]
-            for _ in range(len(field_names))]
-
-    data_fields, axes = _interpolate_select_variables(field_names, data_fields,
-                                                      axes, decimal_hours)
-
     subtit = (" from Cloudnet", " from CloudnetPy")
+
     for i, name in enumerate(field_names):
+        fields = list(zip(*data_fields))[i]
+        axes = list(zip(*axes_data))[i]
+
+        plot_type = ATTRIBUTES[name].plot_type
         fig, ax = plot._initialize_figure(len(nc_files))
         for ii in range(len(nc_files)):
-            ax[ii] = plot._initialize_time_height_axes(ax[ii], len(nc_files), ii, max_y)
-            if ATTRIBUTES[name].plot_type == 'segment':
-                plot_func = plot._plot_segment_data
+            field, axis = plot._fix_data_limitation(fields[ii], axes[ii], max_y)
+            plot._set_axes(ax[ii], max_y)
+            if plot_type == 'model':
+                plot._plot_colormesh_data(ax[ii], field, name, axis)
+
+            elif plot_type == 'bar':
+                plot._plot_bar_data(ax[ii], field, name, axis)
+                plot._set_axes(ax[ii], 1, ATTRIBUTES[name].ylabel)
+
+            elif plot_type == 'segment':
+                plot._plot_segment_data(ax[ii], field, name, axis)
+
             else:
-                plot_func = plot._plot_colormesh_data
-            plot_func(ax[ii], data_fields[ii][i], axes[i][ii], name)
+                plot._plot_colormesh_data(ax[ii], field, name, axis)
+
             ax[ii].set_title(ATTRIBUTES[name].name + subtit[ii], fontsize=14)
         plot._add_subtitle(fig, len(nc_files), case_date)
+        ax[-1].set_xlabel('Time (UTC)', fontsize=13)
 
         if save_path:
             file_name = parse_saving_name(save_path, case_date, [name], "_compare")
@@ -64,24 +79,33 @@ def generate_figure_from_two_files(nc_files, field_names, show=True,
         plt.close()
 
 
-def generate_relative_err_fig(nc_files, field_names, show=True,
-                                   save_path=None, max_y=12, dpi=200):
+def generate_relative_err_fig(nc_files, field_names, types, show=True,
+                              save_path=None, max_y=12, dpi=200):
     """ Creates figure of  relative error calculated two arrays with same size"""
+
+    # Not working if variable name not same for old and new file
     field_names = plot._parse_field_names(nc_files[0], field_names)
     data_fields = [ptools.read_nc_fields(nc_file, field_names) for nc_file in nc_files]
-    decimal_hours = [ptools.read_nc_fields(nc_file, ['time']) for nc_file in nc_files]
-    case_date = plot._read_case_date(nc_files[0])
-    axes = [[plot._read_axes(nc_file, case_date) for nc_file in nc_files]
-            for _ in range(len(field_names))]
 
-    data_fields, axes = _interpolate_select_variables(field_names, data_fields,
-                                                      axes, decimal_hours)
+    # Information used for interpolation
+    axes_data = [[plot._read_axes(nc_file, types[i]) for i in range(len(field_names))]
+                 for nc_file in nc_files]
+    data_fields, axes_data = _interpolate_select_variables(field_names, data_fields,
+                                                           axes_data)
+    case_date = plot._read_case_date(nc_files[0])
+
     for i, name in enumerate(field_names):
+        fields = list(zip(*data_fields))[i]
+        axes = list(zip(*axes_data))[i]
+
+        plot_type = ATTRIBUTES[name].plot_type
         fig, ax = plot._initialize_figure(1)
-        ax = plot._initialize_time_height_axes(ax[0], 1, i, max_y)
-        if ATTRIBUTES[name].plot_type == 'mesh':
-            error = _calculate_relative_error(data_fields[0][i], data_fields[1][i])
-            _plot_relative_error(ax, error, axes[i][1], name)
+
+        plot._set_axes(ax[0], max_y)
+        if plot_type == 'mesh':
+            error = _calculate_relative_error(fields[0], fields[1])
+            error, axis = plot._fix_data_limitation(error, axes[1], max_y)
+            _plot_relative_error(ax[0], error, axis, name)
 
         if save_path:
             file_name = parse_saving_name(save_path, case_date, [name], "_error")
@@ -90,14 +114,13 @@ def generate_relative_err_fig(nc_files, field_names, show=True,
             plt.show()
 
 
-def _interpolate_select_variables(field_names, data_field, axes, decimal_hours):
+def _interpolate_select_variables(field_names, data_field, axes):
     # Default is different dimensions with new and old files
     for i, name in enumerate(field_names):
         if ATTRIBUTES[name].plot_type == 'mesh':
             data_field[0][i] = _interpolate_data_and_dimensions\
-                (data_field[0][i], axes[i], decimal_hours)
-            axes[i][0] = axes[i][1]
-
+                (data_field[0][i], list(zip(*axes))[i])
+            axes[0][i] = axes[1][i]
     return data_field, axes
 
 
@@ -108,11 +131,11 @@ def parse_saving_name(save_path, case_date, field_names, ending):
     return file_name
 
 
-def _interpolate_data_and_dimensions(data, axes, decimal_hours):
+def _interpolate_data_and_dimensions(data, axes):
     n = np.min(data)
     data = np.asarray(data)
-    data = utils.interpolate_2d(decimal_hours[0][0], axes[0][1], data,
-                                decimal_hours[-1][0], axes[1][1])
+    data = utils.interpolate_2d(axes[0][0], axes[0][1], data,
+                                axes[1][0], axes[1][1])
     data = ma.masked_where(data < n, data)
     return data
 
@@ -123,17 +146,20 @@ def _calculate_relative_error(old_data, new_data):
     inds[ind] = True
     old_data[~inds] = ma.masked
     new_data[~inds] = ma.masked
-    error = ((new_data - old_data) / old_data) * 100
-    return error
+    return ((new_data - old_data) / old_data) * 100
 
 
 if __name__ == '__main__':
     outname = '/home/korpinen/Documents/ACTRIS/cloudnetpy/test_data_iwc.nc'
     old_iwc_file = '/home/korpinen/Documents/ACTRIS/cloudnet_data/20181204_mace-head_iwc-Z-T-method.nc'
+    fname = '/home/korpinen/Documents/ACTRIS/cloudnet_data/categorize_test_file_new.nc'
+    old_fname = '/home/korpinen/Documents/ACTRIS/cloudnet_data/20181204_mace-head_categorize.nc'
     save_plots = '/home/korpinen/Documents/ACTRIS/cloudnetpy/plots/'
-
+    """
     generate_figure_from_two_files([old_iwc_file, outname],
-                                   ['iwc','iwc_error'])
-
+                                   ['iwc', 'iwc_error', 'iwc_retrieval_status'],
+                                   [None, None, None])
+    """
     generate_relative_err_fig([old_iwc_file, outname],
-                              ['iwc','iwc_error'])
+                              ['iwc', 'iwc_error', 'iwc_retrieval_status'],
+                              [None, None, None])
