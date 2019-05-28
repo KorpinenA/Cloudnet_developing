@@ -35,15 +35,16 @@ def generate_figure_from_two_files(nc_files, field_names, types, show=True,
         types(list): list of plot types of variables
     """
     # Not working if variable name not same for old and new file
-    field_names = plot._parse_field_names(nc_files[0], field_names)
-    data_fields = [ptools.read_nc_fields(nc_file, field_names) for nc_file in nc_files]
+    old_data, new_data = [plot._find_valid_fields(nc_file, field_names) for nc_file in nc_files]
+    data_fields = [old_data[0], new_data[0]]
+    field_names = old_data[-1]
 
     # Information used for interpolation
     axes_data = [[plot._read_axes(nc_file, types[i]) for i in range(len(field_names))]
                   for nc_file in nc_files]
     data_fields, axes_data = _interpolate_select_variables(field_names, data_fields,
                                                            axes_data)
-    case_date = plot._read_case_date(nc_files[0])
+    case_date, site_name = plot._read_case_date(nc_files[0])
     subtit = (" from Cloudnet", " from CloudnetPy")
 
     for i, name in enumerate(field_names):
@@ -69,11 +70,11 @@ def generate_figure_from_two_files(nc_files, field_names, types, show=True,
                 plot._plot_colormesh_data(ax[ii], field, name, axis)
 
             ax[ii].set_title(ATTRIBUTES[name].name + subtit[ii], fontsize=14)
-        plot._add_subtitle(fig, len(nc_files), case_date)
+        plot._add_subtitle(fig, case_date, site_name)
         ax[-1].set_xlabel('Time (UTC)', fontsize=13)
 
         if save_path:
-            file_name = _parse_saving_name(save_path, case_date, [name], "_compare")
+            file_name = _parse_saving_name(save_path, case_date, max_y, [name], "_compare")
             plt.savefig(file_name, bbox_inches='tight', dpi=dpi)
         if show:
             plt.show()
@@ -85,33 +86,37 @@ def generate_relative_err_fig(nc_files, field_names, types, show=True,
     """ Creates figure of  relative error calculated two arrays with same size"""
 
     # Not working if variable name not same for old and new file
-    field_names = plot._parse_field_names(nc_files[0], field_names)
-    data_fields = [ptools.read_nc_fields(nc_file, field_names) for nc_file in nc_files]
+    old_data, new_data = [plot._find_valid_fields(nc_file, field_names) for nc_file in nc_files]
+    data_fields = [old_data[0], new_data[0]]
+    field_names = old_data[-1]
 
     # Information used for interpolation
     axes_data = [[plot._read_axes(nc_file, types[i]) for i in range(len(field_names))]
                  for nc_file in nc_files]
     data_fields, axes_data = _interpolate_select_variables(field_names, data_fields,
                                                            axes_data)
-    case_date = plot._read_case_date(nc_files[0])
+    case_date, site_name = plot._read_case_date(nc_files[0])
 
     for i, name in enumerate(field_names):
         fields = list(zip(*data_fields))[i]
         axes = list(zip(*axes_data))[i]
 
         plot_type = ATTRIBUTES[name].plot_type
-        fig, ax = plot._initialize_figure(1)
-
-        plot._set_axes(ax[0], max_y)
         if plot_type == 'mesh':
+            fig, ax = plot._initialize_figure(1)
+            plot._set_axes(ax[0], max_y)
+
             error = _calculate_relative_error(fields[0], fields[1])
             error, axis = plot._fix_data_limitation(error, axes[1], max_y)
             _plot_relative_error(ax[0], error, axis, name)
 
-        if save_path:
-            file_name = _parse_saving_name(save_path, case_date, [name], "_error")
+        plot._add_subtitle(fig, case_date, site_name)
+        ax[-1].set_xlabel('Time (UTC)', fontsize=13)
+
+        if save_path and plot_type == 'mesh':
+            file_name = _parse_saving_name(save_path, case_date, max_y, [name], "_error")
             plt.savefig(file_name, bbox_inches='tight', dpi=dpi)
-        if show:
+        if show and plot_type == 'mesh':
             plt.show()
 
 
@@ -125,8 +130,8 @@ def _interpolate_select_variables(field_names, data_field, axes):
     return data_field, axes
 
 
-def _parse_saving_name(save_path, case_date, field_names, ending):
-    file_name = plot._create_save_name(save_path, case_date, field_names)
+def _parse_saving_name(save_path, case_date, max_y, field_names, ending):
+    file_name = plot._create_save_name(save_path, case_date, max_y, field_names)
     file_name = file_name.split('.')
     file_name = file_name[0] + ending + ".png"
     return file_name
@@ -153,12 +158,14 @@ def _calculate_relative_error(old_data, new_data):
 if __name__ == '__main__':
     outname = '/home/korpinen/Documents/ACTRIS/cloudnetpy/test_data_iwc.nc'
     old_iwc_file = '/home/korpinen/Documents/ACTRIS/cloudnet_data/20181204_mace-head_iwc-Z-T-method.nc'
+    fname = '/home/korpinen/Documents/ACTRIS/cloudnet_data/categorize_test_file_new.nc'
+    old_fname = '/home/korpinen/Documents/ACTRIS/cloudnet_data/20181204_mace-head_categorize.nc'
     save_plots = '/home/korpinen/Documents/ACTRIS/cloudnetpy/plots/'
 
     generate_figure_from_two_files([old_iwc_file, outname],
                                    ['iwc', 'iwc_error', 'iwc_retrieval_status'],
-                                   [None, None, None])
+                                   [None, None, None], save_path=save_plots)
 
     generate_relative_err_fig([old_iwc_file, outname],
                               ['iwc', 'iwc_error', 'iwc_retrieval_status'],
-                              [None, None, None])
+                              [None, None, None], save_path=save_plots)
