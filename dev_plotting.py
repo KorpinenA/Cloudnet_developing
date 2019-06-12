@@ -57,7 +57,7 @@ def generate_figure_from_two_files(nc_files, field_names, types, show=True,
                 plot._plot_colormesh_data(ax[ii], field, name, axis)
 
             elif plot_type == 'bar':
-                plot._plot_bar_data(ax[ii], field, name, axis)
+                plot._plot_bar_data(ax[ii], field, name, axis[0])
                 plot._set_axes(ax[ii], 1, ATTRIBUTES[name].ylabel)
 
             elif plot_type == 'segment':
@@ -85,7 +85,6 @@ def generate_figure_from_two_files(nc_files, field_names, types, show=True,
 
 def _interpolate_select_variables(field_names, data_field, axes):
     # Default is different dimensions with new and old files
-    
     def _interpolate_data_and_dimensions(data, axes):
         n = np.min(data)
         data = np.asarray(data)
@@ -103,7 +102,7 @@ def _interpolate_select_variables(field_names, data_field, axes):
 
 
 def _calculate_relative_error(old_data, new_data):
-    ind = np.where((old_data > 0) & (new_data > 0))
+    ind = np.where((old_data >= np.min(old_data)) & (new_data >= np.min(new_data)))
     inds = np.full(new_data.shape, False, dtype=bool)
     inds[ind] = True
     old_data[~inds] = ma.masked
@@ -128,10 +127,12 @@ def _parse_saving_name(save_path, case_date, max_y, field_names, ending):
 
 
 def storage_file_info(quantity):
+    cloudnetpy_class = '/home/korpinen/Documents/ACTRIS/cloudnetpy/test_data_classification.nc'
     cloudnetpy_iwc = '/home/korpinen/Documents/ACTRIS/cloudnetpy/test_data_iwc.nc'
     cloudnetpy_lwc = '/home/korpinen/Documents/ACTRIS/cloudnetpy/test_data_lwc.nc'
     cloudnetpy_drizzle = '/home/korpinen/Documents/ACTRIS/cloudnetpy/test_data_drizzle.nc'
 
+    cloudnet_class = '/home/korpinen/Documents/ACTRIS/cloudnet_data/20181204_mace-head_classification.nc'
     cloudnet_iwc = '/home/korpinen/Documents/ACTRIS/cloudnet_data/20181204_mace-head_iwc-Z-T-method.nc'
     cloudnet_lwc = '/home/korpinen/Documents/ACTRIS/cloudnet_data/20181204_mace-head_lwc-scaled-adiabatic.nc'
     cloudnet_drizzle = '/home/korpinen/Documents/ACTRIS/cloudnet_data/20181204_mace-head_drizzle.nc'
@@ -139,11 +140,12 @@ def storage_file_info(quantity):
     cloudnetpy_cat = '/home/korpinen/Documents/ACTRIS/cloudnet_data/categorize_test_file_new.nc'
     cloudnet_cat = '/home/korpinen/Documents/ACTRIS/cloudnet_data/20181204_mace-head_categorize.nc'
 
+    class_quantities = ['target_classification', 'detection_status']
     iwc_quantities = ['iwc', 'iwc_inc_rain', 'iwc_error', 'iwc_retrieval_status']
-    lwc_quantities = ['lwc', 'lwc_error', 'lwc_retrieval_status', 'lwp', 'lwp_error']
+    lwc_quantities = ['lwc', 'lwc_error', 'lwc_retrieval_status', 'lwp']
     drizzle_quantities = ['Do', 'mu', 'S', 'N', 'drizzle_N', 'lwc', 'drizzle_lwc',
-                          'lwf', 'drizzle_lwf', 'droplet_fall_velocity', 'v_drizzle',
-                          'w', 'v_air']
+                          'lwf', 'drizzle_lwf', 'drizzle_retrieval_status',
+                          'droplet_fall_velocity', 'v_drizzle', 'w', 'v_air']
     drizzle_errors = ['Do_error', 'S_error', 'N_error', 'drizzle_N_error',
                       'lwc_error', 'drizzle_lwc_error', 'lwf_error', 'drizzle_lwf_error',
                       'droplet_fall_velocity_error', 'v_drizzle_error']
@@ -152,7 +154,8 @@ def storage_file_info(quantity):
     cat_bits = ['droplet', 'falling', 'cold', 'melting', 'aerosol', 'insect']
     qual_bits = ['radar', 'lidar', 'clutter', 'molecular', 'attenuated', 'corrected']
 
-    data = {'iwc': [cloudnet_iwc, cloudnetpy_iwc, iwc_quantities, [None] * len(iwc_quantities)],
+    data = {'classification': [cloudnet_class, cloudnetpy_class, class_quantities, [None] * len(class_quantities)],
+            'iwc': [cloudnet_iwc, cloudnetpy_iwc, iwc_quantities, [None] * len(iwc_quantities)],
             'lwc': [cloudnet_lwc, cloudnetpy_lwc, lwc_quantities, [None] * len(lwc_quantities)],
             'drizzle': [cloudnet_drizzle, cloudnetpy_drizzle, drizzle_quantities, [None] * len(drizzle_quantities)],
             'drizzle_error': [cloudnet_drizzle, cloudnetpy_drizzle, drizzle_errors, [None] * len(drizzle_errors)],
@@ -165,9 +168,11 @@ def storage_file_info(quantity):
 
 if __name__ == '__main__':
     # Run program of compering old and new files
+
     save_plots = '/home/korpinen/Documents/ACTRIS/cloudnetpy/plots/'
 
-    data = storage_file_info('drizzle_error')
+    # Key options: 'classification','iwc', 'lwc', 'drizzle', 'drizzle_error', 'categorize', 'cat_bits', 'qual_bits'
+    data = storage_file_info('qual_bits')
 
     generate_figure_from_two_files([data[0], data[1]],
-                                   data[2], data[3], re_err=True, max_y=2)
+                                   data[2], data[3])
