@@ -48,7 +48,6 @@ def generate_figure_from_two_files(nc_files, field_names, types, old_file=False,
             fig, ax = plot._initialize_figure(len(nc_files))
 
         for ii in range(len(nc_files)):
-            print("kierros", ii)
             field, axis = plot._fix_data_limitation(fields[ii], axes[ii], max_y)
             plot._set_axes(ax[ii], max_y)
             if plot_type == 'model':
@@ -62,9 +61,7 @@ def generate_figure_from_two_files(nc_files, field_names, types, old_file=False,
 
             elif plot_type == 'segment':
                 if old_file and ii == 0:
-                    print(np.unique(field))
                     field, name = fix_old_data(field, name)
-                print(np.unique(field))
                 plot._plot_segment_data(ax[ii], field, name, axis)
 
             else:

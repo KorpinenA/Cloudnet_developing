@@ -54,7 +54,6 @@ def fix_old_data(data, name):
         segments = [x[0] for x in ATTRIBUTES[name].hidden]
         segments_to_hide = np.char.startswith(segments, '_')
         indices = np.where(segments_to_hide)[0]
-        #print(indices)
         for ind in np.flip(indices):
             data[data == ind] = ma.masked
             data[data > ind] -= 1
@@ -70,10 +69,7 @@ def fix_old_data(data, name):
 
     if name in ATTRIBUTES.keys():
         if ATTRIBUTES[name].hidden:
-            print("poista data")
-            print(np.unique(data))
             _remove_data()
-            print(np.unique(data))
         if ATTRIBUTES[name].swapped:
             _swap_data()
         if ATTRIBUTES[name].rename:
