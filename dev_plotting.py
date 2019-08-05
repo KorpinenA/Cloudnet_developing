@@ -6,13 +6,14 @@ import cloudnetpy.products.product_tools as ptools
 from cloudnetpy import utils
 import cloudnetpy.plotting as plot
 from cloudnetpy.plot_meta import ATTRIBUTES
+from cloudnetpy.meta_for_old_files import fix_old_data
 
 """Plotting functions in development state
     - Generate figures to compare two variables
 """
 
 
-def generate_figure_from_two_files(nc_files, field_names, types, show=True,
+def generate_figure_from_two_files(nc_files, field_names, types, old_file=False, show=True,
                                    re_err=False, save_path=None, max_y=12, dpi=200):
     """ Compare product from two different files by subplotting
         Can plot several variables in loop,
@@ -25,10 +26,6 @@ def generate_figure_from_two_files(nc_files, field_names, types, show=True,
         types(list): list of plot types of variables, None if not Model
     """
     old_data, new_data = [plot._find_valid_fields(nc_file, field_names) for nc_file in nc_files]
-
-    print(old_data[-1])
-    print(new_data[-1])
-
     data_fields = [old_data[0], new_data[0]]
     field_names = new_data[-1]
 
@@ -51,16 +48,23 @@ def generate_figure_from_two_files(nc_files, field_names, types, show=True,
             fig, ax = plot._initialize_figure(len(nc_files))
 
         for ii in range(len(nc_files)):
+            print("kierros", ii)
             field, axis = plot._fix_data_limitation(fields[ii], axes[ii], max_y)
             plot._set_axes(ax[ii], max_y)
             if plot_type == 'model':
                 plot._plot_colormesh_data(ax[ii], field, name, axis)
 
             elif plot_type == 'bar':
+                if name == 'lwp' and ii == 0:
+                    field = field*1000
                 plot._plot_bar_data(ax[ii], field, name, axis[0])
                 plot._set_axes(ax[ii], 1, ATTRIBUTES[name].ylabel)
 
             elif plot_type == 'segment':
+                if old_file and ii == 0:
+                    print(np.unique(field))
+                    field, name = fix_old_data(field, name)
+                print(np.unique(field))
                 plot._plot_segment_data(ax[ii], field, name, axis)
 
             else:
@@ -168,11 +172,10 @@ def storage_file_info(quantity):
 
 if __name__ == '__main__':
     # Run program of compering old and new files
-
     save_plots = '/home/korpinen/Documents/ACTRIS/cloudnetpy/plots/'
 
     # Key options: 'classification','iwc', 'lwc', 'drizzle', 'drizzle_error', 'categorize', 'cat_bits', 'qual_bits'
-    data = storage_file_info('qual_bits')
-
+    data = storage_file_info('lwc')
     generate_figure_from_two_files([data[0], data[1]],
-                                   data[2], data[3])
+                                   data[2], data[3],
+                                   old_file=True, max_y=12)
